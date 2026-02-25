@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>2FA Helper Tester</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, sans-serif; background: #1a1a2e; color: #eee; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+    .card { background: #16213e; border-radius: 16px; padding: 40px; width: 420px; box-shadow: 0 8px 32px rgba(0,0,0,.4); }
+    h1 { font-size: 20px; margin-bottom: 8px; }
+    p.sub { color: #888; font-size: 13px; margin-bottom: 24px; }
+    .messages { display: flex; flex-direction: column; gap: 8px; margin-bottom: 24px; max-height: 300px; overflow-y: auto; }
+    .msg { background: #0a3d62; padding: 10px 14px; border-radius: 12px; font-size: 14px; animation: fadeIn .3s; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    .buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+    button { background: #0f3460; border: 1px solid #1a5276; color: #eee; padding: 10px 16px; border-radius: 8px; cursor: pointer; font-size: 13px; transition: background .2s; }
+    button:hover { background: #1a5276; }
+    .custom { display: flex; gap: 8px; }
+    input { flex: 1; background: #0d1b2a; border: 1px solid #1a5276; color: #eee; padding: 10px 14px; border-radius: 8px; font-size: 14px; outline: none; }
+    input:focus { border-color: #3282b8; }
+    .status { margin-top: 16px; padding: 12px; background: #0d1b2a; border-radius: 8px; font-size: 13px; color: #888; text-align: center; }
+    .paste-test { margin-top: 16px; }
+    .paste-test label { font-size: 13px; color: #888; display: block; margin-bottom: 6px; }
+    .paste-test input { width: 100%; font-size: 18px; letter-spacing: 8px; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>2FA Helper Tester</h1>
+    <p class="sub">Simulate incoming iMessages with 2FA codes, then paste below to verify.</p>
+
+    <div class="messages" id="messages"></div>
+
+    <div class="buttons">
+      <button onclick="send('Your verification code is 847291')">Verification Code</button>
+      <button onclick="send('G-482916 is your Google verification code')">Google Style</button>
+      <button onclick="send('Your Uber code: 5823')">Uber Style</button>
+      <button onclick="send('OTP: 938271 for login')">OTP Style</button>
+      <button onclick="send('Sign in code: 7462. Do not share.')">Sign-in Code</button>
+      <button onclick="send('Hello, how are you?')">No Code (test)</button>
+    </div>
+
+    <div class="custom">
+      <input type="text" id="custom" placeholder="Type a custom message..." onkeydown="if(event.key==='Enter')sendCustom()">
+      <button onclick="sendCustom()">Send</button>
+    </div>
+
+    <div class="paste-test">
+      <label>Paste your code here to test (Cmd+V):</label>
+      <input type="text" id="paste" placeholder="------" autocomplete="off">
+    </div>
+
+    <div class="status" id="status">Messages will be inserted into your local iMessage database.</div>
+  </div>
+
+  <script>
+    const messagesEl = document.getElementById('messages');
+    const statusEl = document.getElementById('status');
+
+    function send(text) {
+      // Show in UI
+      const div = document.createElement('div');
+      div.className = 'msg';
+      div.textContent = text;
+      messagesEl.appendChild(div);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+
+      // Send to local server to insert into Messages DB
+      fetch('/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text })
+      })
+      .then(r => r.json())
+      .then(d => {
+        statusEl.textContent = d.ok ? `Sent! Code should appear in ~2s.` : `Error: ${d.error}`;
+        statusEl.style.color = d.ok ? '#2ecc71' : '#e74c3c';
+      })
+      .catch(e => {
+        statusEl.textContent = `Error: ${e.message}`;
+        statusEl.style.color = '#e74c3c';
+      });
+    }
+
+    function sendCustom() {
+      const input = document.getElementById('custom');
+      if (input.value.trim()) {
+        send(input.value.trim());
+        input.value = '';
+      }
+    }
+  </script>
+</body>
+</html>

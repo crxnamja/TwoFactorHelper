@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.DS_Store
+AppIcon.iconset/
+icon_preview.png
+TwoFactorHelper.zip
+/TwoFactorHelper
+*.o

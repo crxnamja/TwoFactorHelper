@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>2FA Helper - Auto-copy verification codes from iMessage</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
+      background: #0a0a1a;
+      color: #e8e8f0;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Gradient background */
+    .bg {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: radial-gradient(ellipse at 30% 20%, rgba(40, 60, 200, 0.15) 0%, transparent 60%),
+                  radial-gradient(ellipse at 70% 80%, rgba(100, 40, 180, 0.1) 0%, transparent 60%);
+      z-index: 0;
+    }
+
+    .container {
+      position: relative; z-index: 1;
+      max-width: 720px; margin: 0 auto; padding: 60px 24px 80px;
+      text-align: center;
+    }
+
+    /* Icon */
+    .icon {
+      width: 140px; height: 140px; border-radius: 32px; margin: 0 auto 32px;
+      background: linear-gradient(135deg, #2840d0, #5020a0);
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 12px 40px rgba(40, 60, 200, 0.35);
+      position: relative; overflow: hidden;
+    }
+    .icon::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 50%;
+      background: linear-gradient(to bottom, rgba(255,255,255,0.12), transparent);
+      border-radius: 32px 32px 0 0;
+    }
+    .icon-text {
+      font-size: 48px; font-weight: 800; color: white; letter-spacing: 2px;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      position: relative; z-index: 1;
+    }
+
+    h1 {
+      font-size: 44px; font-weight: 700; letter-spacing: -1px;
+      margin-bottom: 16px;
+      background: linear-gradient(135deg, #fff, #b0b0d0);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+
+    .tagline {
+      font-size: 20px; color: #8888aa; margin-bottom: 40px; line-height: 1.5;
+    }
+
+    /* Download button */
+    .download-btn {
+      display: inline-flex; align-items: center; gap: 12px;
+      background: linear-gradient(135deg, #3050e0, #6030c0);
+      color: white; text-decoration: none;
+      padding: 18px 40px; border-radius: 14px;
+      font-size: 18px; font-weight: 600;
+      box-shadow: 0 8px 30px rgba(50, 70, 220, 0.4);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .download-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 40px rgba(50, 70, 220, 0.5);
+    }
+    .download-btn svg { width: 22px; height: 22px; }
+    .download-meta {
+      margin-top: 12px; font-size: 13px; color: #666;
+    }
+
+    /* Features */
+    .features {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+      margin: 56px 0; text-align: left;
+    }
+    .feature {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 14px; padding: 24px;
+      transition: background 0.2s;
+    }
+    .feature:hover { background: rgba(255,255,255,0.07); }
+    .feature-icon { font-size: 28px; margin-bottom: 10px; }
+    .feature h3 { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+    .feature p { font-size: 14px; color: #8888aa; line-height: 1.5; }
+
+    /* How it works */
+    .how {
+      margin: 48px 0; text-align: left;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 16px; padding: 32px;
+    }
+    .how h2 {
+      font-size: 22px; margin-bottom: 20px; text-align: center;
+    }
+    .steps { list-style: none; counter-reset: step; }
+    .steps li {
+      counter-increment: step;
+      padding: 12px 0 12px 48px; position: relative;
+      font-size: 15px; color: #aaa; line-height: 1.5;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .steps li:last-child { border-bottom: none; }
+    .steps li::before {
+      content: counter(step);
+      position: absolute; left: 0; top: 12px;
+      width: 32px; height: 32px; border-radius: 50%;
+      background: rgba(50, 70, 220, 0.2); color: #7090ff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; font-weight: 700;
+    }
+
+    /* Footer */
+    .footer {
+      margin-top: 56px; padding-top: 24px;
+      border-top: 1px solid rgba(255,255,255,0.06);
+      font-size: 13px; color: #555;
+    }
+    .footer a { color: #7090ff; text-decoration: none; }
+
+    @media (max-width: 600px) {
+      h1 { font-size: 32px; }
+      .tagline { font-size: 17px; }
+      .features { grid-template-columns: 1fr; }
+      .icon { width: 110px; height: 110px; border-radius: 26px; }
+      .icon-text { font-size: 38px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="bg"></div>
+  <div class="container">
+    <div class="icon">
+      <span class="icon-text">2FA</span>
+    </div>
+
+    <h1>2FA Helper</h1>
+    <p class="tagline">
+      Auto-copies verification codes from iMessage to your clipboard.<br>
+      No more switching apps to copy a 6-digit code.
+    </p>
+
+    <a href="https://github.com/crxnamja/TwoFactorHelper/releases/latest/download/TwoFactorHelper.zip" class="download-btn">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+      Download for macOS
+    </a>
+    <p class="download-meta">macOS 13+ &middot; Apple Silicon &amp; Intel &middot; Free &amp; open source</p>
+
+    <div class="features">
+      <div class="feature">
+        <div class="feature-icon">&#9889;</div>
+        <h3>Instant Detection</h3>
+        <p>Monitors iMessage every 2 seconds. Code is on your clipboard before you switch apps.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">&#128276;</div>
+        <h3>Native Notifications</h3>
+        <p>Get a macOS notification showing the code when it arrives. Also shown in the menu bar.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">&#128737;</div>
+        <h3>Privacy First</h3>
+        <p>Runs 100% locally. No network calls, no analytics, no data leaves your Mac.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">&#129520;</div>
+        <h3>Smart Parsing</h3>
+        <p>Recognizes codes from Google, Uber, banks, and most 2FA formats automatically.</p>
+      </div>
+    </div>
+
+    <div class="how">
+      <h2>Setup</h2>
+      <ol class="steps">
+        <li>Download and unzip <strong>TwoFactorHelper.zip</strong></li>
+        <li>Move <strong>TwoFactorHelper.app</strong> to your Applications folder</li>
+        <li>Open <strong>System Settings &gt; Privacy &amp; Security &gt; Full Disk Access</strong> and add TwoFactorHelper</li>
+        <li>Launch the app &mdash; look for the shield icon in your menu bar</li>
+        <li>That's it! Next time you get a 2FA text, the code auto-copies to your clipboard</li>
+      </ol>
+    </div>
+
+    <div class="footer">
+      <a href="https://github.com/crxnamja/TwoFactorHelper">View on GitHub</a> &middot; Built with Python &amp; PyObjC
+    </div>
+  </div>
+</body>
+</html>
