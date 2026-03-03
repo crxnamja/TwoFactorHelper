@@ -27,7 +27,7 @@ from AppKit import (
     NSPasteboard,
     NSPasteboardTypeString,
 )
-from Foundation import NSDate, NSObject
+from Foundation import NSBundle, NSDate, NSObject
 
 objc.loadBundle(
     "UserNotifications",
@@ -74,18 +74,28 @@ def extract_code(text):
 
 
 def send_notification(title, subtitle, body):
-    """Send a native macOS notification."""
-    content = UNMutableNotificationContent.alloc().init()
-    content.setTitle_(title)
-    content.setSubtitle_(subtitle)
-    content.setBody_(body)
-    content.setSound_(UNNotificationSound.defaultSound())
+    """Send a native macOS notification with fallback."""
+    # Try UNUserNotificationCenter first
+    try:
+        content = UNMutableNotificationContent.alloc().init()
+        content.setTitle_(title)
+        content.setSubtitle_(subtitle)
+        content.setBody_(body)
 
-    request = UNNotificationRequest.requestWithIdentifier_content_trigger_(
-        str(time.time()), content, None
-    )
-    center = UNUserNotificationCenter.currentNotificationCenter()
-    center.addNotificationRequest_withCompletionHandler_(request, None)
+        request = UNNotificationRequest.requestWithIdentifier_content_trigger_(
+            str(time.time()), content, None
+        )
+        center = UNUserNotificationCenter.currentNotificationCenter()
+        center.addNotificationRequest_withCompletionHandler_(request, None)
+    except Exception:
+        # Fallback: use osascript for notification banner
+        try:
+            subprocess.Popen([
+                "osascript", "-e",
+                f'display notification "{body}" with title "{title}" subtitle "{subtitle}"'
+            ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception:
+            pass
 
 
 def copy_to_clipboard(text):
@@ -165,6 +175,7 @@ class TwoFactorHelperApp(NSObject):
 
         self.monitor = MessageMonitor()
         self.last_code = None
+        self._clear_timer = None
         return self
 
     def applicationDidFinishLaunching_(self, notification):
@@ -248,6 +259,10 @@ class TwoFactorHelperApp(NSObject):
         # Copy to clipboard
         copy_to_clipboard(code)
 
+        # Show code in menu bar next to icon
+        button = self.status_item.button()
+        button.setTitle_(f" {code}")
+
         # Update menu
         self.status_menu_item.setTitle_(f"Copied: {code}")
         self.last_code_item.setTitle_(f"Last code: {code} (click to copy)")
@@ -256,6 +271,18 @@ class TwoFactorHelperApp(NSObject):
         # Send notification
         preview = source[:60] + ("..." if len(source) > 60 else "")
         send_notification("2FA Code Copied", code, preview)
+
+        # Clear code from menu bar after 30 seconds
+        if self._clear_timer is not None:
+            self._clear_timer.invalidate()
+        self._clear_timer = NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
+            30.0, self, "clearMenuBarCode:", None, False
+        )
+
+    def clearMenuBarCode_(self, timer):
+        """Remove the code from menu bar after timeout."""
+        button = self.status_item.button()
+        button.setTitle_("")
 
     @objc.python_method
     def _copy_code(self, code):
@@ -268,6 +295,12 @@ class TwoFactorHelperApp(NSObject):
 
 
 def main():
+    # Set bundle identifier so macOS attributes notifications to this app
+    bundle = NSBundle.mainBundle()
+    info = bundle.infoDictionary()
+    if info and "CFBundleIdentifier" not in info:
+        info["CFBundleIdentifier"] = "com.sunflower.twofactorhelper"
+
     app = NSApplication.sharedApplication()
     app.setActivationPolicy_(2)  # NSApplicationActivationPolicyAccessory (hide from dock)
 
