@@ -148,8 +148,18 @@ def copy_to_clipboard(text):
 
 
 def can_access_database():
-    """Check if we can read the Messages database."""
-    return os.access(DB_PATH, os.R_OK)
+    """Check if we can read the Messages database.
+
+    Uses an actual sqlite3 open rather than os.access(), because macOS TCC
+    (Full Disk Access) is not reliably reflected by the POSIX access() syscall.
+    """
+    try:
+        conn = sqlite3.connect(f"file:{DB_PATH}?mode=ro", uri=True)
+        conn.execute("SELECT 1 FROM message LIMIT 1")
+        conn.close()
+        return True
+    except Exception:
+        return False
 
 
 class MessageMonitor:
