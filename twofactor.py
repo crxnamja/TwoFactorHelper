@@ -152,14 +152,17 @@ def can_access_database():
 
     Uses an actual sqlite3 open rather than os.access(), because macOS TCC
     (Full Disk Access) is not reliably reflected by the POSIX access() syscall.
+    Returns (True, None) on success or (False, error_string) on failure.
     """
+    if not os.path.exists(DB_PATH):
+        return False, f"Database not found: {DB_PATH}"
     try:
         conn = sqlite3.connect(f"file:{DB_PATH}?mode=ro", uri=True)
         conn.execute("SELECT 1 FROM message LIMIT 1")
         conn.close()
-        return True
-    except Exception:
-        return False
+        return True, None
+    except Exception as e:
+        return False, str(e)
 
 
 class MessageMonitor:
@@ -232,6 +235,7 @@ class TwoFactorHelperApp(NSObject):
         self.monitor = MessageMonitor()
         self.last_code = None
         self._clear_timer = None
+        self._retry_timer = None
         return self
 
     def applicationDidFinishLaunching_(self, notification):
@@ -285,23 +289,48 @@ class TwoFactorHelperApp(NSObject):
 
         self.status_item.setMenu_(self.menu)
 
-        # Check database access
-        if not can_access_database():
-            self.status_menu_item.setTitle_(
-                "Error: Grant Full Disk Access in System Settings"
+        # Check database access (retries periodically if it fails)
+        self.timer = None
+        self._tryStartMonitoring()
+
+    def _tryStartMonitoring(self):
+        """Attempt to access the Messages DB and begin monitoring.
+
+        If access fails, schedules a retry every 5 seconds so the app
+        recovers automatically once Full Disk Access is granted.
+        """
+        ok, err = can_access_database()
+        if ok:
+            self.status_menu_item.setTitle_("Monitoring for codes...")
+            if self._retry_timer is not None:
+                self._retry_timer.invalidate()
+                self._retry_timer = None
+            # Start polling timer (every 2 seconds)
+            self.timer = NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
+                2.0, self, "checkForCodes:", None, True
             )
+            NSRunLoop.currentRunLoop().addTimer_forMode_(self.timer, NSDefaultRunLoopMode)
+            return
+
+        # Show error with detail so user can diagnose
+        self.status_menu_item.setTitle_(
+            f"Error: {err} — Grant Full Disk Access in System Settings"
+        )
+        # Schedule retry if not already retrying
+        if getattr(self, '_retry_timer', None) is None:
             send_notification(
                 "2FA Helper",
                 "Permission Required",
                 "Grant Full Disk Access in System Settings > Privacy & Security",
             )
-            return
+            self._retry_timer = NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
+                5.0, self, "retryAccess:", None, True
+            )
+            NSRunLoop.currentRunLoop().addTimer_forMode_(self._retry_timer, NSDefaultRunLoopMode)
 
-        # Start polling timer (every 2 seconds)
-        self.timer = NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
-            2.0, self, "checkForCodes:", None, True
-        )
-        NSRunLoop.currentRunLoop().addTimer_forMode_(self.timer, NSDefaultRunLoopMode)
+    def retryAccess_(self, timer):
+        """Periodically retry database access."""
+        self._tryStartMonitoring()
 
     def checkForCodes_(self, timer):
         """Timer callback to check for new 2FA codes."""
