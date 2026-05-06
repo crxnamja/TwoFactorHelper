@@ -39,8 +39,10 @@ from PyObjCTools import AppHelper
 
 # 2FA code patterns - order matters, more specific patterns first
 CODE_PATTERNS = [
-    # "Your code is 123456" / "verification code: 123456" / "code: 1234"
-    re.compile(r'(?:code|passcode|pin)\s*(?:is|:)\s*(\d{4,8})\b', re.IGNORECASE),
+    # "Your code is 123456" / "verification code: 123456" / "code: 1234" / "PIN: NMLYN"
+    # Keyword is case-insensitive but the code must be uppercase/digits to avoid
+    # matching ordinary lowercase words after phrases like "the code is broken".
+    re.compile(r'(?i:(?:code|passcode|pin)\s*(?:is|:)\s*)([A-Z0-9]{4,8})\b'),
     # "123456 is your (verification) code"
     re.compile(r'\b(\d{4,8})\s+is\s+your\s+(?:\w+\s+)?code', re.IGNORECASE),
     # "OTP: 123456" or "OTP is 123456"
